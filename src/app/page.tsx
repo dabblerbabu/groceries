@@ -1,65 +1,96 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { ReceiptUploader } from "@/components/ReceiptUploader";
+import { ReceiptList } from "@/components/ReceiptList";
+import { Dashboard } from "@/components/Dashboard";
+import { ShoppingList } from "@/components/ShoppingList";
+import { ShoppingCart, Upload, FileText, ListChecks, BarChart2 } from "lucide-react";
+import { UserButton } from "@clerk/nextjs";
+import type { Receipt } from "@/lib/types";
+
+const TABS = [
+  { id: "upload",   label: "Upload",   Icon: Upload     },
+  { id: "receipts", label: "Receipts", Icon: FileText   },
+  { id: "list",     label: "List",     Icon: ListChecks },
+  { id: "insights", label: "Insights", Icon: BarChart2  },
+] as const;
+
+type TabId = typeof TABS[number]["id"];
 
 export default function Home() {
+  const [receipts, setReceipts] = useState<Receipt[]>([]);
+  const [activeTab, setActiveTab] = useState<TabId>("upload");
+
+  const loadReceipts = useCallback(async () => {
+    const res = await fetch("/api/receipts");
+    const data = await res.json();
+    setReceipts(data);
+  }, []);
+
+  useEffect(() => { loadReceipts(); }, [loadReceipts]);
+
+  const handleUploadSuccess = () => {
+    loadReceipts();
+    setTimeout(() => setActiveTab("receipts"), 1500);
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div style={{ minHeight: "100vh", background: "#f9fafb" }}>
+
+      {/* Header */}
+      <div style={{ background: "white", borderBottom: "1px solid #e5e7eb", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+        <ShoppingCart style={{ width: 20, height: 20, color: "#2563eb", flexShrink: 0 }} />
+        <span style={{ fontWeight: 700, fontSize: 18, color: "#111827" }}>Receipt Tracker</span>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
+          {receipts.length > 0 && (
+            <span style={{ fontSize: 12, color: "#6b7280", background: "#f3f4f6", padding: "2px 8px", borderRadius: 999 }}>
+              {receipts.length} receipt{receipts.length !== 1 ? "s" : ""}
+            </span>
+          )}
+          <UserButton />
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+      </div>
+
+      {/* Tab bar — plain block, no positioning tricks */}
+      <div style={{ background: "white", borderBottom: "1px solid #e5e7eb", display: "flex" }}>
+        {TABS.map(({ id, label, Icon }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setActiveTab(id)}
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 4,
+              padding: "10px 4px",
+              fontSize: 11,
+              fontWeight: 500,
+              border: "none",
+              borderBottom: `3px solid ${activeTab === id ? "#2563eb" : "transparent"}`,
+              background: "transparent",
+              color: activeTab === id ? "#2563eb" : "#6b7280",
+              cursor: "pointer",
+              WebkitTapHighlightColor: "transparent",
+            }}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+            <Icon style={{ width: 20, height: 20 }} />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Content */}
+      <div style={{ maxWidth: 672, margin: "0 auto", padding: "16px 12px 40px" }}>
+        {activeTab === "upload"   && <ReceiptUploader onSuccess={handleUploadSuccess} />}
+        {activeTab === "receipts" && <ReceiptList receipts={receipts} onDelete={(id) => setReceipts(p => p.filter(r => r.id !== id))} />}
+        {activeTab === "list"     && <ShoppingList />}
+        {activeTab === "insights" && <Dashboard />}
+      </div>
+
     </div>
   );
 }
