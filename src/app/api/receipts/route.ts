@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { parseReceiptImage } from "@/lib/parse-receipt";
 import { storage } from "@/lib/storage";
 import { upsertStore, insertReceipt, insertItems, getReceipts, syncCatalogFromItems } from "@/lib/queries";
 
 export async function GET() {
-  const receipts = await getReceipts();
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const receipts = await getReceipts(userId);
   return NextResponse.json(receipts);
 }
 
 export async function POST(req: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const formData = await req.formData();
     const file = formData.get("receipt") as File | null;
@@ -31,6 +36,7 @@ export async function POST(req: NextRequest) {
 
     const storeId = await upsertStore(parsed.store_name, parsed.store_address ?? undefined);
     const receiptId = await insertReceipt({
+      user_id: userId,
       store_id: storeId,
       date: parsed.date,
       total: parsed.total,
@@ -50,7 +56,7 @@ export async function POST(req: NextRequest) {
       }))
     );
 
-    await syncCatalogFromItems();
+    await syncCatalogFromItems(userId);
 
     return NextResponse.json({ id: receiptId, parsed }, { status: 201 });
   } catch (err) {

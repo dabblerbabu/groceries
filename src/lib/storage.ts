@@ -72,8 +72,11 @@ class LocalStorage implements Storage {
 class BlobStorage implements Storage {
   async save({ bytes, contentType, prefix = "receipts", filename }: SaveInput): Promise<StoredObject> {
     const key = objectKey(prefix, filename, contentType);
+    // Private store: blobs are not publicly fetchable. The URL is stored only as a
+    // reference; nothing renders it today. To display images later, add an
+    // authenticated proxy route that streams the blob (auth + ownership check).
     const blob = await put(key, bytes, {
-      access: "public",
+      access: "private",
       contentType,
       addRandomSuffix: false, // key already carries a unique id
     });

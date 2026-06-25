@@ -6,6 +6,7 @@ import { ReceiptList } from "@/components/ReceiptList";
 import { Dashboard } from "@/components/Dashboard";
 import { ShoppingList } from "@/components/ShoppingList";
 import { ShoppingCart, Upload, FileText, ListChecks, BarChart2 } from "lucide-react";
+import { UserButton } from "@clerk/nextjs";
 import type { Receipt } from "@/lib/types";
 
 const TABS = [
@@ -41,11 +42,14 @@ export default function Home() {
       <div style={{ background: "white", borderBottom: "1px solid #e5e7eb", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
         <ShoppingCart style={{ width: 20, height: 20, color: "#2563eb", flexShrink: 0 }} />
         <span style={{ fontWeight: 700, fontSize: 18, color: "#111827" }}>Receipt Tracker</span>
-        {receipts.length > 0 && (
-          <span style={{ fontSize: 12, color: "#6b7280", background: "#f3f4f6", padding: "2px 8px", borderRadius: 999, marginLeft: "auto" }}>
-            {receipts.length} receipt{receipts.length !== 1 ? "s" : ""}
-          </span>
-        )}
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
+          {receipts.length > 0 && (
+            <span style={{ fontSize: 12, color: "#6b7280", background: "#f3f4f6", padding: "2px 8px", borderRadius: 999 }}>
+              {receipts.length} receipt{receipts.length !== 1 ? "s" : ""}
+            </span>
+          )}
+          <UserButton />
+        </div>
       </div>
 
       {/* Tab bar — plain block, no positioning tricks */}

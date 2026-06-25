@@ -23,6 +23,7 @@ const SCHEMA = `
 
   CREATE TABLE IF NOT EXISTS receipts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT,
     store_id INTEGER REFERENCES stores(id) ON DELETE SET NULL,
     date TEXT NOT NULL,
     total REAL NOT NULL,
@@ -45,15 +46,16 @@ const SCHEMA = `
 
   CREATE TABLE IF NOT EXISTS catalog_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT,
     name TEXT NOT NULL,
     category TEXT DEFAULT 'other',
     is_custom INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now'))
   );
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_catalog_name ON catalog_items(lower(name));
 
   CREATE TABLE IF NOT EXISTS shopping_list (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT,
     name TEXT NOT NULL,
     category TEXT DEFAULT 'other',
     quantity REAL DEFAULT 1,
@@ -67,10 +69,33 @@ const SCHEMA = `
   CREATE INDEX IF NOT EXISTS idx_receipts_date ON receipts(date);
   CREATE INDEX IF NOT EXISTS idx_items_receipt ON items(receipt_id);
   CREATE INDEX IF NOT EXISTS idx_items_category ON items(category);
-
-  INSERT OR IGNORE INTO catalog_items (name, category, is_custom)
-  SELECT DISTINCT name, category, 0 FROM items;
 `;
+
+// Columns/indexes added after the initial schema. Applied idempotently on top of
+// CREATE TABLE IF NOT EXISTS so both fresh and pre-existing databases converge.
+async function migrate(): Promise<void> {
+  for (const [table, col] of [
+    ["receipts", "user_id"],
+    ["catalog_items", "user_id"],
+    ["shopping_list", "user_id"],
+  ] as const) {
+    const info = await client.execute(`PRAGMA table_info(${table})`);
+    if (!info.rows.some((r) => r.name === col)) {
+      await client.execute(`ALTER TABLE ${table} ADD COLUMN ${col} TEXT`);
+    }
+  }
+  // user_id indexes — created here (not in SCHEMA) so the column is guaranteed to
+  // exist first on pre-existing databases.
+  await client.execute("CREATE INDEX IF NOT EXISTS idx_receipts_user ON receipts(user_id)");
+  await client.execute("CREATE INDEX IF NOT EXISTS idx_shopping_user ON shopping_list(user_id)");
+
+  // Catalog uniqueness must be per-user, not global. Drop the old global index
+  // (idx_catalog_name on lower(name)) and recreate it scoped by user_id.
+  await client.execute("DROP INDEX IF EXISTS idx_catalog_name");
+  await client.execute(
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_catalog_user_name ON catalog_items(user_id, lower(name))",
+  );
+}
 
 // Run schema setup exactly once, memoized. Every query awaits getDb() so the
 // schema is guaranteed to exist before the first statement runs.
@@ -78,7 +103,7 @@ const SCHEMA = `
 // a one-time migration step once the DB is hosted.
 let ready: Promise<void> | null = null;
 function ensureSchema(): Promise<void> {
-  if (!ready) ready = client.executeMultiple(SCHEMA);
+  if (!ready) ready = client.executeMultiple(SCHEMA).then(() => migrate());
   return ready;
 }
 
